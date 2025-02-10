@@ -3035,6 +3035,9 @@ msgstr "Enable"
 msgid "disable"
 msgstr "Disable"
 
+msgid "menu_mute_music"
+msgstr "Mute Music"
+
 msgid "menu_music_volume"
 msgstr "Music Volume"
 

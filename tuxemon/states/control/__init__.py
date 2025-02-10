@@ -231,9 +231,22 @@ class ControlState(PygameMenuState):
             ),
             font_size=self.font_size_small,
         )
+
         menu.add.button(
             title=T.translate("menu_reset_default").upper(),
             action=reset_config_to_default,
+            font_size=self.font_size_small,
+        )
+
+        def mute_music() -> None:
+            if player:
+                player.game_variables["music_volume"] = 0
+                self.client.current_music.set_volume(0)
+                music.set_value(0)
+
+        menu.add.button(
+            title=T.translate("menu_mute_music").upper(),
+            action=mute_music,
             font_size=self.font_size_small,
         )
 
