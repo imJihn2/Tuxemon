@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0
-# Copyright (c) 2014-2025 William Edwards <shadowapex@gmail.com>, Benjamin Bean <superman2k5@gmail.com>
+# Copyright (c) 2014-2024 William Edwards <shadowapex@gmail.com>, Benjamin Bean <superman2k5@gmail.com>
 from __future__ import annotations
 
 import logging
@@ -12,7 +12,7 @@ import pygame
 from pygame.rect import Rect
 
 from tuxemon import combat, graphics, tools
-from tuxemon.db import State, TechSort
+from tuxemon.db import ElementType, State, TechSort
 from tuxemon.locale import T
 from tuxemon.menu.interface import MenuItem
 from tuxemon.menu.menu import Menu, PopUpMenu
@@ -207,8 +207,9 @@ class MainCombatMenuState(PopUpMenu[MenuGameObj]):
 
     def open_technique_menu(self) -> None:
         """Open menus to choose a Technique to use."""
-
         def choose_technique() -> None:
+            # Sort techniques by order 
+            """available_techniques.sort(key=lambda tech: tech.next_use, reverse=True)"""
             available_techniques = [
                 tech
                 for tech in self.monster.moves
@@ -226,7 +227,7 @@ class MainCombatMenuState(PopUpMenu[MenuGameObj]):
                 tech_skip = MenuItem(skip_image, None, None, skip)
                 menu.add(tech_skip)
 
-            for tech in self.monster.moves:
+            for tech in self.monster.moves: 
                 tech_name = tech.name
                 tech_color = None
                 tech_enabled = True
@@ -302,7 +303,7 @@ class MainCombatMenuState(PopUpMenu[MenuGameObj]):
                 return
 
             # Pre-check the technique for validity
-            self.combat._combat_variables["action_tech"] = technique.slug
+            self.character.game_variables["action_tech"] = technique.slug
             technique = combat.pre_checking(
                 self.monster, technique, target, self.combat
             )
@@ -362,7 +363,7 @@ class CombatTargetMenuState(Menu[Monster]):
         self.targeting_map: defaultdict[str, list[Monster]] = defaultdict(list)
 
         if (
-            self.technique.has_type("aether")
+            self.technique.has_type(ElementType.aether)
             or self.technique.sort == TechSort.meta
         ):
             sprite = self.combat_state._monster_sprite_map[self.monster]

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0
-# Copyright (c) 2014-2025 William Edwards <shadowapex@gmail.com>, Benjamin Bean <superman2k5@gmail.com>
+# Copyright (c) 2014-2024 William Edwards <shadowapex@gmail.com>, Benjamin Bean <superman2k5@gmail.com>
 from __future__ import annotations
 
 import logging
@@ -9,11 +9,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from tuxemon import plugin
 from tuxemon.constants import paths
-from tuxemon.db import CommonCondition, CommonEffect, Range, db
+from tuxemon.db import ElementType, Range, db
 from tuxemon.element import Element
 from tuxemon.locale import T
 from tuxemon.technique.techcondition import TechCondition
 from tuxemon.technique.techeffect import TechEffect, TechEffectResult
+
+
 
 if TYPE_CHECKING:
     from tuxemon.monster import Monster
@@ -45,8 +47,11 @@ class Technique:
         self.accuracy = 0.0
         self.animation: Optional[str] = None
         self.combat_state: Optional[CombatState] = None
+        self.conditions: Sequence[TechCondition] = []
         self.description = ""
+        self.effects: Sequence[TechEffect] = []
         self.flip_axes = ""
+        self.icon = ""
         self.hit = False
         self.is_fast = False
         self.randomly = True
@@ -66,6 +71,8 @@ class Technique:
         self.use_success = ""
         self.use_failure = ""
         self.use_tech = ""
+        self.moves: Sequence[Technique]
+        self.monster = ""
 
         # load effect and condition plugins if it hasn't been done already
         if not Technique.effects_classes:
@@ -106,30 +113,31 @@ class Technique:
         self.use_success = T.maybe_translate(results.use_success)
         self.use_failure = T.maybe_translate(results.use_failure)
 
+        self.icon = results.icon
         self.counter = self.counter
+        
         # types
         self.types = [Element(ele) for ele in results.types]
         # technique stats
-        self.accuracy = results.accuracy
-        self.potency = results.potency
-        self.power = results.power
+        self.accuracy = results.accuracy or self.accuracy
+        self.potency = results.potency or self.potency
+        self.power = results.power or self.power
 
-        self.default_potency = results.potency
-        self.default_power = results.power
+        self.default_potency = results.potency or self.potency
+        self.default_power = results.power or self.power
 
         self.hit = self.hit
-        self.is_fast = results.is_fast
-        self.randomly = results.randomly
-        self.healing_power = results.healing_power
-        self.recharge_length = results.recharge
+        self.is_fast = results.is_fast or self.is_fast
+        self.randomly = results.randomly or self.randomly
+        self.healing_power = results.healing_power or self.healing_power
+        self.recharge_length = results.recharge or self.recharge_length
         self.range = results.range or Range.melee
-        self.tech_id = results.tech_id
+        self.tech_id = results.tech_id or self.tech_id
 
         self.conditions = self.parse_conditions(results.conditions)
         self.effects = self.parse_effects(results.effects)
         self.target = results.target.model_dump()
-        self.usable_on = results.usable_on
-        self.modifiers = results.modifiers
+        self.usable_on = results.usable_on or self.usable_on
 
         # Load the animation sprites that will be used for this technique
         self.animation = results.animation
@@ -140,7 +148,7 @@ class Technique:
 
     def parse_effects(
         self,
-        raw: Sequence[CommonEffect],
+        raw: Sequence[str],
     ) -> Sequence[TechEffect]:
         """
         Convert effect strings to effect objects.
@@ -156,18 +164,24 @@ class Technique:
 
         """
         effects = []
-        for effect in raw:
+
+        for line in raw:
+            parts = line.split(maxsplit=1)
+            name = parts[0]
+            params = parts[1].split(",") if len(parts) > 1 else []
+
             try:
-                effect_class = Technique.effects_classes[effect.type]
+                effect_class = Technique.effects_classes[name]
             except KeyError:
-                logger.error(f'TechEffect "{effect.type}" not implemented')
+                logger.error(f'Error: TechEffect "{name}" not implemented')
             else:
-                effects.append(effect_class(*effect.parameters))
+                effects.append(effect_class(*params))
+
         return effects
 
     def parse_conditions(
         self,
-        raw: Sequence[CommonCondition],
+        raw: Sequence[str],
     ) -> Sequence[TechCondition]:
         """
         Convert condition strings to condition objects.
@@ -183,27 +197,50 @@ class Technique:
 
         """
         conditions = []
-        for condition in raw:
+
+        for line in raw:
+            parts = line.split(maxsplit=2)
+            op = parts[0]
+            name = parts[1]
+            params = parts[2].split(",") if len(parts) > 2 else []
+
             try:
-                condition_class = Technique.conditions_classes[condition.type]
+                condition_class = Technique.conditions_classes[name]
             except KeyError:
-                logger.error(
-                    f'TechCondition "{condition.type}" not implemented'
-                )
+                logger.error(f'Error: TechCondition "{name}" not implemented')
                 continue
 
-            condition_obj = condition_class(*condition.parameters)
-            condition_obj._op = condition.operator == "is"
-            conditions.append(condition_obj)
+            if op not in ["is", "not"]:
+                raise ValueError(f"{op} must be 'is' or 'not'")
+
+            condition = condition_class(*params)
+            condition._op = op == "is"
+            conditions.append(condition)
 
         return conditions
 
     def advance_round(self) -> None:
         """
         Advance the counter for this technique if used.
-
         """
+        print("La fonction a ete appelee!")
         self.counter += 1
+
+        """Prendre la liste de toute les techs x 0.95 (ajout autre count) et ajouter 1 pour la tech utilise"""
+        # Appliquer la réduction de 5% à toutes les techniques
+        for tech in self.monster.moves:
+            self.counter = max(0, int(self.counter * 0.95))  
+        print("On est la!!!!")
+
+    # Ajouter +1 à la technique utilisée
+        self.counter += 1
+        print(self.monster.moves) 
+
+    # Trier les techniques par self.counter en ordre décroissant
+        self.monster.moves.sort(key= self.counter, reverse=True)
+
+        """logger.info("Techniques triées par usage : %s", [(tech.slug, tech.counter) for tech in all_techniques])"""
+
 
     def validate(self, target: Optional[Monster]) -> bool:
         """
@@ -270,39 +307,39 @@ class Technique:
 
         # Defaults for the return. items can override these values in their
         # return.
-        meta_result = TechEffectResult(
-            name=self.name,
-            success=False,
-            should_tackle=False,
-            damage=0,
-            element_multiplier=0.0,
-            extras=[],
-        )
+        meta_result: TechEffectResult = {
+            "name": self.name,
+            "success": False,
+            "should_tackle": False,
+            "damage": 0,
+            "element_multiplier": 0.0,
+            "extra": None,
+        }
 
         self.next_use = self.recharge_length
 
         # Loop through all the effects of this technique and execute the effect's function.
         for effect in self.effects:
             result = effect.apply(self, user, target)
-            meta_result.name = result.name
-            meta_result.success = meta_result.success or result.success
-            meta_result.should_tackle = (
-                meta_result.should_tackle or result.should_tackle
+            meta_result["success"] = (
+                meta_result["success"] or result["success"]
             )
-            meta_result.damage += result.damage
-            meta_result.element_multiplier += result.element_multiplier
-            meta_result.extras.extend(result.extras)
+            meta_result["should_tackle"] = (
+                meta_result["should_tackle"] or result["should_tackle"]
+            )
+            meta_result["damage"] += result["damage"]
+            meta_result["element_multiplier"] *= result["element_multiplier"]
+            if result["extra"] is not None:
+                meta_result["extra"] = result["extra"]
 
         return meta_result
 
-    def has_type(self, type_slug: Optional[str]) -> bool:
+    def has_type(self, element: Optional[ElementType]) -> bool:
         """
         Returns TRUE if there is the type among the types.
         """
         return (
-            type_slug in [type_obj.slug for type_obj in self.types]
-            if type_slug
-            else False
+            element in [ele.slug for ele in self.types] if element else False
         )
 
     def set_stats(self) -> None:
